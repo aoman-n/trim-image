@@ -51,7 +51,9 @@ const ImageCroppingModal: React.FC = () => {
 };
 
 const inputCanvas = { width: 400, height: 400 };
-const outCanvas = { width: 300, height: 300 };
+const outCanvas = { width: 200, height: 200 };
+const minScale = 10;
+const maxScale = 200;
 
 const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
   imageUrl,
@@ -61,7 +63,7 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
   const outCanvasRef = useRef<HTMLCanvasElement>(null);
   const imageSize = useRef({ width: 0, height: 0 });
   const scaleRef = useRef(0);
-  const imageCenterC = useRef({ width: 0, height: 0 });
+  const imageCenterC = useRef({ x: 0, y: 0 });
   const [scale, setScale] = useState(0);
   const mouseDown = useRef(false);
 
@@ -99,8 +101,8 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
   img.current.onload = () => {
     // imageの中心位置をstateに保存
     imageCenterC.current = {
-      width: img.current.width / 2,
-      height: img.current.height / 2,
+      x: img.current.width / 2,
+      y: img.current.height / 2,
     };
 
     // imageの画像サイズをstateに保存
@@ -112,6 +114,8 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
     // スケーリング
     const scl = Number((inputCanvas.width / img.current.width) * 100);
     setScale(scl);
+
+    // scaling(scl);
     scaleRef.current = scl * 0.01;
 
     // 描画
@@ -127,7 +131,7 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
     const v = Number(e.target.value);
     setScale(v)
     scaleRef.current = v * 0.01;
-    drawCanvas(imageCenterC.current.width, imageCenterC.current.height);
+    drawCanvas(imageCenterC.current.x, imageCenterC.current.y);
   };
 
   const sx = useRef(0); // canvas ドラッグ開始位置
@@ -143,16 +147,16 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
     if (mouseDown.current === false) return;
     mouseDown.current = false;
     drawCanvas(
-      (imageCenterC.current.width += (sx.current - e.pageX) / scaleRef.current),
-      (imageCenterC.current.height += (sy.current - e.pageY) / scaleRef.current),
+      (imageCenterC.current.x += (sx.current - e.pageX) / scaleRef.current),
+      (imageCenterC.current.y += (sy.current - e.pageY) / scaleRef.current),
     );
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
     if (mouseDown.current === false) return;
     drawCanvas(
-      imageCenterC.current.width + (sx.current - e.pageX) / scaleRef.current,
-      imageCenterC.current.height + (sy.current - e.pageY) / scaleRef.current,
+      imageCenterC.current.x + (sx.current - e.pageX) / scaleRef.current,
+      imageCenterC.current.y + (sy.current - e.pageY) / scaleRef.current,
     );
   };
 
@@ -168,8 +172,8 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
         0,
         img.current.width,
         img.current.height,
-        outCanvas.width / 2 - imageCenterC.current.width * scaleRef.current,
-        outCanvas.height / 2 - imageCenterC.current.height * scaleRef.current,
+        outCanvas.width / 2 - imageCenterC.current.x * scaleRef.current,
+        outCanvas.height / 2 - imageCenterC.current.y * scaleRef.current,
         img.current.width * scaleRef.current,
         img.current.height * scaleRef.current,
       );
@@ -207,16 +211,25 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
 
   const scaling = ( _v: number ) => {
     scaleRef.current = _v * 0.01;
-    drawCanvas( imageCenterC.current.width, imageCenterC.current.height );
+    drawCanvas( imageCenterC.current.x, imageCenterC.current.y );
   }
 
-  const onWheel = (e: React.WheelEvent) => {
-    // どの方向にスクロールしても拡大縮小する
-    let scl = scale + ((e.deltaY + e.deltaX + e.deltaZ) * 0.05);
-    if ( scl < 10  ) scl = 10
-    if ( scl > 400 ) scl = 400
+  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    // let scl = scale + ((e.deltaY + e.deltaX + e.deltaZ) * 0.05);
+    let scl = scale + e.deltaY * 0.05;
+    if ( scl < minScale  ) scl = minScale;
+    if ( scl > maxScale ) scl = maxScale;
     setScale(scl);
     scaling(scl);
+  }
+
+  const onMouseLeave = (e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (mouseDown.current === false) return;
+    mouseDown.current = false;
+    drawCanvas(
+      (imageCenterC.current.x += (sx.current - e.pageX) / scaleRef.current),
+      (imageCenterC.current.y += (sy.current - e.pageY) / scaleRef.current),
+    );
   }
 
   return (
@@ -228,8 +241,8 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
             id="scal"
             type="range"
             value={scale}
-            min="10"
-            max="400"
+            min={minScale}
+            max={maxScale}
             onChange={onChangeScale}
             style={{ width: '300px' }}
           />
@@ -243,6 +256,7 @@ const TestDes: React.FC<{ imageUrl: string; fileName: string }> = ({
             onMouseUp={onMouseUp}
             onMouseMove={onMouseMove}
             onWheel={onWheel}
+            onMouseLeave={onMouseLeave}
           />
           <br />
           <button type="button" onClick={cropImg}>
